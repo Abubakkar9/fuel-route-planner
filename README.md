@@ -242,7 +242,7 @@ make load-data      # Load + geocode fuel stations from CSV
 make migrate        # Run Django migrations
 make makemigrations # Generate new migration files
 
-make test           # Run full test suite inside Docker (130 tests, ~1s)
+make test           # Run full test suite inside Docker (144 tests, ~8s)
 make test-local     # Run tests locally (requires pip install -r requirements.txt)
 
 make shell          # Open Django shell
@@ -261,10 +261,30 @@ make test
 ```
 
 ```
-collected 130 items
+collected 144 items
 ...
-130 passed in 0.94s
+144 passed in 7.86s
 ```
+
+### Test coverage
+
+| File | What it tests |
+|---|---|
+| `test_auth.py` | Registration validation, token obtain, 401 enforcement on route endpoint |
+| `test_views.py` | Route endpoint input validation, response shape, all HTTP error codes, map/health views |
+| `test_fuel_optimizer.py` | Haversine formula, station filtering, greedy stop selection, edge cases |
+| `test_geocoding.py` | Nominatim response parsing, USA bounding-box rejection, cache integration |
+| `test_routing.py` | OSRM/ORS response parsing, OSRM↔ORS fallback logic, cache integration |
+| `test_cache_manager.py` | Cache-aside pattern, distributed lock, key validation, invalidation, health check |
+| `test_load_fuel_data.py` | CSV parsing, deduplication, Canadian filtering, DB upsert, batch geocoding |
+
+### Test design decisions
+
+- **No external calls** — all Nominatim, OSRM, and ORS calls are mocked
+- **No real Redis** — `LocMemCache` replaces Redis; lock tests mock the cache object directly
+- **No real PostgreSQL** — SQLite in-memory via `config/test_settings.py`
+- **Auth bypassed for logic tests** — `force_authenticate` is used in route view tests so they test route logic, not JWT; `test_auth.py` tests the JWT layer separately
+- **`RouteView` has explicit `authentication_classes = [JWTAuthentication]`** — ensures 401 (not 403) is returned for missing/invalid tokens regardless of test settings
 
 ---
 
