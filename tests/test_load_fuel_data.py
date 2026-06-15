@@ -46,7 +46,7 @@ class TestCSVParsing:
     def test_creates_us_stations(self, tmp_csv):
         path = tmp_csv(make_csv((1, "Station A", "Chicago", "IL", "3.50")))
         with override_settings(FUEL_CSV_PATH=path):
-            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state",
+            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state_batch",
                        return_value=(41.88, -87.63)):
                 with patch("time.sleep"):
                     call_command("load_fuel_data")
@@ -60,7 +60,7 @@ class TestCSVParsing:
         )
         path = tmp_csv(content)
         with override_settings(FUEL_CSV_PATH=path):
-            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state",
+            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state_batch",
                        return_value=(41.88, -87.63)):
                 with patch("time.sleep"):
                     call_command("load_fuel_data")
@@ -76,7 +76,7 @@ class TestCSVParsing:
         )
         path = tmp_csv(content)
         with override_settings(FUEL_CSV_PATH=path):
-            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state",
+            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state_batch",
                        return_value=(41.88, -87.63)):
                 with patch("time.sleep"):
                     call_command("load_fuel_data")
@@ -87,7 +87,7 @@ class TestCSVParsing:
         content = CSV_HEADER + "99,Bad Station,Addr,City,TX,100,NOT_A_NUMBER\n"
         path = tmp_csv(content)
         with override_settings(FUEL_CSV_PATH=path):
-            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state",
+            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state_batch",
                        return_value=(30.0, -97.0)):
                 call_command("load_fuel_data")
         assert not FuelStation.objects.filter(opis_id=99).exists()
@@ -111,7 +111,7 @@ class TestDBUpsert:
         )
         path = tmp_csv(content)
         with override_settings(FUEL_CSV_PATH=path):
-            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state",
+            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state_batch",
                        return_value=(30.0, -97.0)):
                 with patch("time.sleep"):
                     call_command("load_fuel_data")
@@ -124,7 +124,7 @@ class TestDBUpsert:
         content = make_csv((20, "Updated Station", "Houston", "TX", "3.00"))
         path = tmp_csv(content)
         with override_settings(FUEL_CSV_PATH=path):
-            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state",
+            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state_batch",
                        return_value=(29.76, -95.37)):
                 call_command("load_fuel_data")
         station = FuelStation.objects.get(opis_id=20)
@@ -134,7 +134,7 @@ class TestDBUpsert:
         content = make_csv((30, "Station Z", "Phoenix", "AZ", "3.40"))
         path = tmp_csv(content)
         with override_settings(FUEL_CSV_PATH=path):
-            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state",
+            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state_batch",
                        return_value=(33.45, -112.07)):
                 with patch("time.sleep"):
                     call_command("load_fuel_data")
@@ -150,7 +150,7 @@ class TestGeocodingStep:
         content = make_csv((40, "Station A", "Denver", "CO", "3.60"))
         path = tmp_csv(content)
         with override_settings(FUEL_CSV_PATH=path):
-            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state",
+            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state_batch",
                        return_value=(39.74, -104.99)):
                 with patch("time.sleep"):
                     call_command("load_fuel_data")
@@ -167,7 +167,7 @@ class TestGeocodingStep:
         )
         path = tmp_csv(content)
         with override_settings(FUEL_CSV_PATH=path):
-            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state",
+            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state_batch",
                        return_value=(39.74, -104.99)) as mock_geo:
                 with patch("time.sleep"):  # skip rate-limit delay in tests
                     call_command("load_fuel_data")
@@ -180,7 +180,7 @@ class TestGeocodingStep:
         content = make_csv((60, "Station C", "Seattle", "WA", "3.80"))
         path = tmp_csv(content)
         with override_settings(FUEL_CSV_PATH=path):
-            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state",
+            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state_batch",
                        return_value=(47.61, -122.33)) as mock_geo:
                 with patch("time.sleep"):
                     call_command("load_fuel_data")
@@ -190,7 +190,7 @@ class TestGeocodingStep:
         content = make_csv((70, "Remote Station", "Nowhere", "WY", "4.00"))
         path = tmp_csv(content)
         with override_settings(FUEL_CSV_PATH=path):
-            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state",
+            with patch("route_planner.management.commands.load_fuel_data.geocode_city_state_batch",
                        return_value=(None, None)):
                 with patch("time.sleep"):
                     call_command("load_fuel_data")

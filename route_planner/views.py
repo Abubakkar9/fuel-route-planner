@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import FuelStation
 from .services.geocoding import geocode_address
@@ -62,6 +63,9 @@ class HealthView(APIView):
 
 
 class RouteView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=["Route"],
         summary="Plan a fuel-optimised route",
