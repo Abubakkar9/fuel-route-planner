@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fuel Route Planner</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+    #controls {
+      padding: 12px 16px;
+      background: #1e293b;
+      color: #f1f5f9;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    #controls h1 { font-size: 1rem; font-weight: 600; white-space: nowrap; }
+    #controls input {
+      flex: 1;
+      min-width: 160px;
+      padding: 7px 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    #controls button {
+      padding: 7px 18px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    #controls button:hover { background: #2563eb; }
+    #controls button:disabled { background: #64748b; cursor: not-allowed; }
+    #status { font-size: 0.85rem; color: #94a3b8; }
+    #logoutBtn {
+      padding: 7px 14px;
+      background: transparent;
+      color: #94a3b8;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+    #logoutBtn:hover { color: #f1f5f9; border-color: #94a3b8; }
+    #map { flex: 1; }
+    #sidebar {
+      position: absolute;
+      top: 64px;
+      right: 12px;
+      width: 300px;
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      z-index: 1000;
+      display: none;
+    }
+    #sidebar-inner { padding: 14px; }
+    .summary-box {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+    }
+    .summary-box h2 { font-size: 0.9rem; color: #166534; margin-bottom: 6px; }
+    .summary-box p { font-size: 0.85rem; color: #374151; line-height: 1.6; }
+    .stop-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .stop-card h3 { font-size: 0.82rem; font-weight: 700; color: #1e293b; }
+    .stop-card p { font-size: 0.78rem; color: #6b7280; line-height: 1.5; margin-top: 2px; }
+    .stop-number {
+      display: inline-block;
+      background: #f97316;
+      color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      text-align: center;
+      line-height: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <h1>⛽ Fuel Route Planner</h1>
+    <input id="startInput" type="text" placeholder="Start location (e.g. Chicago, IL)"
+           value="{{ start }}" />
+    <input id="endInput" type="text" placeholder="End location (e.g. Denver, CO)"
+           value="{{ end }}" />
+    <button id="planBtn" onclick="planRoute()">Plan Route</button>
+    <span id="status"></span>
+    <button id="logoutBtn" onclick="logout()">Sign out</button>
+  </div>
+
+  <div id="sidebar">
+    <div id="sidebar-inner"></div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    function getToken() {
+      return localStorage.getItem("access_token");
+    }
+
+    function logout() {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/login/";
+    }
+
+    // Redirect to login if no token
+    if (!getToken()) {
+      window.location.href = "/login/";
+    }
+
+    const map = L.map("map").setView([39.5, -98.35], 4);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors",
+      maxZoom: 18,
+    }).addTo(map);
+
+    let layers = [];
+
+    function clearLayers() {
+      layers.forEach(l => map.removeLayer(l));
+      layers = [];
+    }
+
+    function setStatus(msg, isError = false) {
+      const el = document.getElementById("status");
+      el.textContent = msg;
+      el.style.color = isError ? "#f87171" : "#94a3b8";
+    }
+
+    function makeIcon(color, label) {
+      return L.divIcon({
+        className: "",
+        html: `<div style="background:${color};color:white;border-radius:50%;width:28px;height:28px;
+               display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+               border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)">${label}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      });
+    }
+
+    async function planRoute() {
+      const start = document.getElementById("startInput").value.trim();
+      const end = document.getElementById("endInput").value.trim();
+      if (!start || !end) { setStatus("Enter both locations", true); return; }
+
+      const btn = document.getElementById("planBtn");
+      btn.disabled = true;
+      setStatus("Planning route…");
+      clearLayers();
+      document.getElementById("sidebar").style.display = "none";
+
+      try {
+        const res = await fetch(`/api/route/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`, {
+          headers: { "Authorization": "Bearer " + getToken() },
+        });
+
+        if (res.status === 401) {
+          logout();
+          return;
+        }
+
+        const data = await res.json();
+        if (!res.ok) { setStatus(data.error || "Error", true); btn.disabled = false; return; }
+
+        // Draw route line
+        const routeFeature = data.map_data.features.find(f => f.properties.type === "route");
+        if (routeFeature) {
+          const coords = routeFeature.geometry.coordinates.map(c => [c[1], c[0]]);
+          const line = L.polyline(coords, { color: "#3b82f6", weight: 4, opacity: 0.8 }).addTo(map);
+          layers.push(line);
+          map.fitBounds(line.getBounds(), { padding: [40, 40] });
+        }
+
+        // Draw markers
+        data.map_data.features.forEach(f => {
+          const p = f.properties;
+          if (f.geometry.type !== "Point") return;
+          const [lon, lat] = f.geometry.coordinates;
+
+          if (p.type === "start") {
+            const m = L.marker([lat, lon], { icon: makeIcon("#22c55e", "S") })
+              .bindPopup(`<b>Start</b><br>${p.label}`).addTo(map);
+            layers.push(m);
+          } else if (p.type === "end") {
+            const m = L.marker([lat, lon], { icon: makeIcon("#ef4444", "E") })
+              .bindPopup(`<b>End</b><br>${p.label}`).addTo(map);
+            layers.push(m);
+          } else if (p.type === "fuel_stop") {
+            const popup = `<b>Stop ${p.stop_number}: ${p.station_name}</b><br>
+              $${p.price_per_gallon.toFixed(3)}/gal &nbsp;|&nbsp;
+              ${p.gallons_purchased} gal &nbsp;|&nbsp;
+              <b>$${p.stop_cost.toFixed(2)}</b>`;
+            const m = L.marker([lat, lon], { icon: makeIcon("#f97316", p.stop_number) })
+              .bindPopup(popup).addTo(map);
+            layers.push(m);
+          }
+        });
+
+        // Sidebar
+        const r = data.route;
+        const s = data.summary;
+        let stopsHtml = data.fuel_stops.map(stop => `
+          <div class="stop-card">
+            <h3><span class="stop-number">${stop.stop_number}</span>${stop.station_name}</h3>
+            <p>${stop.address}, ${stop.city}, ${stop.state}</p>
+            <p>$${stop.price_per_gallon.toFixed(3)}/gal &nbsp;·&nbsp;
+               ${stop.gallons_purchased} gal &nbsp;·&nbsp;
+               <b>$${stop.stop_cost.toFixed(2)}</b></p>
+            <p>${stop.distance_from_start_miles.toFixed(0)} miles from start</p>
+          </div>`).join("");
+
+        if (!stopsHtml) stopsHtml = `<p style="color:#6b7280;font-size:0.85rem">No stops needed — route is within vehicle range.</p>`;
+
+        document.getElementById("sidebar-inner").innerHTML = `
+          <div class="summary-box">
+            <h2>Trip Summary</h2>
+            <p>
+              <b>${r.total_distance_miles} miles</b> &nbsp;·&nbsp; ~${r.estimated_duration_hours}h<br>
+              ${s.number_of_stops} fuel stop${s.number_of_stops !== 1 ? "s" : ""} &nbsp;·&nbsp;
+              ${s.total_gallons_purchased} gallons<br>
+              <b>Total fuel cost: $${s.total_fuel_cost.toFixed(2)}</b>
+            </p>
+          </div>
+          ${stopsHtml}`;
+
+        document.getElementById("sidebar").style.display = "block";
+        setStatus(`${r.total_distance_miles} mi · $${s.total_fuel_cost.toFixed(2)} fuel`);
+      } catch (err) {
+        setStatus("Request failed: " + err.message, true);
+      }
+
+      btn.disabled = false;
+    }
+
+    // Auto-plan if start/end were pre-filled from query params
+    window.addEventListener("load", () => {
+      const s = document.getElementById("startInput").value;
+      const e = document.getElementById("endInput").value;
+      if (s && e) planRoute();
+    });
+  </script>
+</body>
+</html>

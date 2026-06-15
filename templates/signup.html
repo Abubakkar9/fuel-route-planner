@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign Up — Fuel Route Planner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    h1 { font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+    .subtitle { font-size: 0.85rem; color: #94a3b8; margin-bottom: 28px; }
+    label { display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 6px; }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #f1f5f9;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #3b82f6; }
+    button {
+      width: 100%;
+      padding: 11px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background 0.2s;
+    }
+    button:hover { background: #2563eb; }
+    button:disabled { background: #475569; cursor: not-allowed; }
+    #error {
+      margin-top: 14px;
+      padding: 10px 12px;
+      background: #450a0a;
+      border: 1px solid #dc2626;
+      border-radius: 6px;
+      font-size: 0.83rem;
+      color: #fca5a5;
+      display: none;
+    }
+    #success {
+      margin-top: 14px;
+      padding: 10px 12px;
+      background: #052e16;
+      border: 1px solid #16a34a;
+      border-radius: 6px;
+      font-size: 0.83rem;
+      color: #86efac;
+      display: none;
+    }
+    .footer { margin-top: 20px; text-align: center; font-size: 0.83rem; color: #64748b; }
+    .footer a { color: #3b82f6; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>⛽ Fuel Route Planner</h1>
+    <p class="subtitle">Create an account to get started</p>
+
+    <label for="username">Username</label>
+    <input id="username" type="text" autocomplete="username" placeholder="Choose a username" />
+
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="new-password" placeholder="At least 8 characters" />
+
+    <label for="password2">Confirm Password</label>
+    <input id="password2" type="password" autocomplete="new-password" placeholder="Repeat your password" />
+
+    <button id="signupBtn" onclick="signup()">Create Account</button>
+    <div id="error"></div>
+    <div id="success"></div>
+
+    <p class="footer">Already have an account? <a href="/login/">Sign in</a></p>
+  </div>
+
+  <script>
+    async function signup() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+      const password2 = document.getElementById("password2").value;
+      const btn = document.getElementById("signupBtn");
+
+      hideMessages();
+
+      if (!username || !password || !password2) {
+        showError("Please fill in all fields.");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Creating account…";
+
+      try {
+        const res = await fetch("/api/auth/register/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password, password2 }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(data.error || "Registration failed.");
+          return;
+        }
+
+        showSuccess("Account created! Redirecting to sign in…");
+        setTimeout(() => window.location.href = "/login/", 1500);
+      } catch (err) {
+        showError("Could not reach the server. Please try again.");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Create Account";
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById("error").textContent = msg;
+      document.getElementById("error").style.display = "block";
+    }
+
+    function showSuccess(msg) {
+      document.getElementById("success").textContent = msg;
+      document.getElementById("success").style.display = "block";
+    }
+
+    function hideMessages() {
+      document.getElementById("error").style.display = "none";
+      document.getElementById("success").style.display = "none";
+    }
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "Enter") signup();
+    });
+  </script>
+</body>
+</html>
